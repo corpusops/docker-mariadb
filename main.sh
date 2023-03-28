@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -e
 shopt -s extglob
+export DOCKER_BUILDKIT=${DOCKER_BUILDKIT-1}
+export COMPOSE_DOCKER_CLI_BUILD=${COMPOSE_DOCKER_CLI_BUILD-1}
+export BUILDKIT_PROGRESS=${BUILDKIT_PROGRESS-plain}
 ## refresh from corpsusops.bootstrap/hacking/shell_glue (copy paste until last function)
 readlinkf() {
     if ( uname | egrep -iq "darwin|bsd" );then
@@ -224,13 +227,12 @@ NBPARALLEL=${NBPARALLEL-2}
 SKIP_TAGS_REBUILD=${SKIP_TAGS_REBUILD-}
 SKIP_TAGS_REFRESH=${SKIP_TAGS_REFRESH-${SKIP_TAGS_REBUILD}}
 SKIP_IMAGES_SCAN=${SKIP_IMAGES_SCAN-}
-SKIP_MINOR_ES="((elasticsearch):.*([0-5]\.?){3}(-32bit.*)?)"
 SKIP_MINOR_ES2="$SKIP_MINOR_ES|(elasticsearch:(5\.[0-4]\.)|(6\.8\.[0-8])|(6\.[0-7])|(7\.9\.[0-2])|(7\.[0-8]))"
 # SKIP_MINOR_NGINX="((nginx):.*[0-9]+\.[0-9]+\.[0-9]+(-32bit.*)?)"
 MINOR_IMAGES="(golang|mariadb|memcached|mongo|mysql|nginx|node|php|postgres|python|rabbitmq|redis|redmine|ruby|solr)"
 SKIP_MINOR_OS="$MINOR_IMAGES:.*alpine[0-9].*"
 SKIP_MINOR="$MINOR_IMAGES:.*[0-9]+\.([0-9]+\.)[0-9]+(-32bit.*)?"
-SKIP_PRE="((redis|node|ruby|php|golang|python|mariadb|mysql|postgres|solr|elasticsearch|mongo|rabbitmq):.*(alpha|beta|rc)[0-9]*(-32bit.*)?)"
+SKIP_PRE="((redis|node|ruby|php|golang|python|mariadb|mysql|postgres|solr|elasticsearch|mongo|rabbitmq|opensearch):.*(alpha|beta|rc)[0-9]*(-32bit.*)?)"
 SKIP_OS="(((archlinux|suse|centos|fedora|redhat|alpine|debian|ubuntu|oldstable|oldoldstable):.*[0-9]{8}.*)"
 SKIP_OS="$SKIP_OS|((node):[0-9]+[0-9]+\.[0-9]+.*)"
 SKIP_OS="$SKIP_OS|((debian|redis):[0-9]+\.[0-9]+.*)"
@@ -252,15 +254,20 @@ SKIP_TF="(tensorflow.serving:[0-9].*)"
 SKIP_MINIO="(k8s-operator|((minio|mc):(RELEASE.)?[0-9]{4}-.{7}))"
 SKIP_MAILU="(mailu.*(feat|patch|merg|refactor|revert|upgrade|fix-|pr-template))"
 SKIP_DOCKER="docker(\/|:)([0-9]+\.[0-9]+\.|17|18.0[1-6]|1$|1(\.|-)).*"
-SKIPPED_TAGS="$SKIP_TF|$SKIP_MINOR_OS|$SKIP_NODE|$SKIP_DOCKER|$SKIP_MINIO|$SKIP_MAILU|$SKIP_MINOR_ES2|$SKIP_MINOR|$SKIP_PRE|$SKIP_OS|$SKIP_PHP|$SKIP_WINDOWS|$SKIP_MISC"
+SKIP_MINOR_ES="elasticsearch:(([0-4]\.?){3}(-32bit.*)?|2\.[0-3]\.|5\.[1-5]\.|1\.[3-7])"
+SKIP_MINOR="(.*solr):.*[0-9]+\.([0-9]+\.)[0-9]+(-32bit.*)?"
+SKIPPED_TAGS="$SKIP_TF|$SKIP_MINOR_OS|$SKIP_NODE|$SKIP_DOCKER|$SKIP_MINIO|$SKIP_MAILU|$SKIP_MINOR_ES|$SKIP_MINOR|$SKIP_PRE|$SKIP_OS|$SKIP_PHP|$SKIP_WINDOWS"
+SKIPPED_TAGS="$SKIP_MINOR_OS|$SKIP_MINOR_ES|$SKIP_PRE|$SKIP_MINOR"
+SKIPPED_TAGS="$SKIPPED_TAGS"
 CURRENT_TS=$(date +%s)
 IMAGES_SKIP_NS="((mailhog|postgis|pgrouting(-bare)?|^library|dejavu|(minio/(minio|mc))))"
 
 
+SKIPPED_TAGS="$SKIP_TF|$SKIP_MINOR_OS|$SKIP_NODE|$SKIP_DOCKER|$SKIP_MINIO|$SKIP_MAILU|$SKIP_MINOR_ES2|$SKIP_MINOR|$SKIP_PRE|$SKIP_OS|$SKIP_PHP|$SKIP_WINDOWS|$SKIP_MISC"
 default_images="
 library/mariadb
 "
-
+PROTECTED_TAGS="corpusops/rsyslog"
 find_top_node_() {
     img=library/node
     if [ ! -e $img ];then return;fi
@@ -471,6 +478,7 @@ gen_image() {
 
 is_skipped() {
     local ret=1 t="$@"
+    if [[ -z $SKIPPED_TAGS ]];then return 1;fi
     if ( echo "$t" | egrep -q "$SKIPPED_TAGS" );then
         ret=0
     fi
@@ -504,8 +512,12 @@ do_get_namespace_tag() {
             # ubuntu-bare / postgis
             if [ -e $i/tag ];then tag=$( cat $i/tag );break;fi
         done
+        for i in $image $image/.. $image/../../..;do
+            # ubuntu-bare / postgis
+            if [ -e $i/version ];then version=$( cat $i/version );break;fi
+        done
         echo "$repo/$tag:$version" \
-            | sed -re "s/(-?(server)?-(web-vault|postgresql|mysql)):/-server:\3-/g"
+            | sed -re "s/(-?(server)?-(web-vault|elasticsearch|opensearch|postgresql|mysql|mongo|mongodb|maria|mariadb)):/-server:\3-/g"
     done
 }
 
@@ -532,13 +544,31 @@ get_image_tags() {
             if [[ -n "${result}" ]];then results="${results} ${result}";else has_more=256;fi
         done
         if [ ! -e "$TOPDIR/$n" ];then mkdir -p "$TOPDIR/$n";fi
-        printf "$results\n" | sort -V > "$t.raw"
+        printf "$results\n" | xargs -n 1 | sed -e "s/ //g" | sort -V > "$t.raw"
+    fi
+    # cleanup elastic minor images (keep latest)
+    ONE_MINOR="elasticsearch"
+    if ( echo $t | egrep -q "$ONE_MINOR" );then
+        atags="$(cat $t.raw)"
+        for ix in $(seq 0 15);do
+            for j in $(seq 0 30);do
+                mv="$(  (( echo "$atags" | egrep "$ix\.$j\." | grep -v alpine ) || true )|sort -V )"
+                amv="$( (( echo "$atags" | egrep "$ix\.$j\." | grep    alpine ) || true )|sort -V )"
+                for selected in "$mv" "$amv";do
+                    if [[ -n "$selected" ]];then
+                        for l in $(echo "$selected"|sed -e "$ d");do
+                            SKIPPED_TAGS="$SKIPPED_TAGS|${ONE_MINOR}:$l$"
+                        done
+                    fi
+                done
+            done
+        done
     fi
     if [[ -z ${SKIP_TAGS_REBUILD} ]];then
     rm -f "$t"
-    ( for i in $(cat "$t.raw");do
+    ( for j in $(cat "$t.raw");do for i in $j;do
         if is_skipped "$n:$i";then debug "Skipped: $n:$i";else printf "$i\n";fi
-      done | awk '!seen[$0]++' | sort -V ) >> "$t"
+      done;done | awk '!seen[$0]++' | sort -V ) >> "$t"
     fi
     set -e
     if [ -e "$t" ];then cat "$t";fi
@@ -575,6 +605,7 @@ do_clean_tags() {
 do_refresh_images() {
     local imagess="${@:-$default_images}"
     cp -vf local/corpusops.bootstrap/bin/cops_pkgmgr_install.sh helpers/
+    if [[ -z ${SKIP_REFRESH_COPS-} ]];then
     if ! ( grep -q corpusops/docker-images .git/config );then
     if [ ! -e local/docker-images ];then
         git clone https://github.com/corpusops/docker-images local/docker-images
@@ -582,13 +613,16 @@ do_refresh_images() {
     ( cd local/docker-images && git fetch --all && git reset --hard origin/master \
       && cp -rf helpers Dock* rootfs packages ../..; )
     fi
+    fi
     while read images;do
         for image in $images;do
             if [[ -n $image ]];then
                 if [[ -z "${SKIP_MAKE_TAGS-}" ]];then
                     make_tags $image
                 fi
-                do_clean_tags $image
+                if ( echo "$image" | egrep -vq "${PROTECTED_TAGS-}" ) || [[ -z ${PROTECTED_TAGS-} ]];then
+                    do_clean_tags $image
+                fi
             fi
         done
     done <<< "$imagess"
