@@ -263,7 +263,7 @@ CURRENT_TS=$(date +%s)
 IMAGES_SKIP_NS="((mailhog|postgis|pgrouting(-bare)?|^library|dejavu|(minio/(minio|mc))))"
 
 
-SKIPPED_TAGS="$SKIP_TF|$SKIP_MINOR_OS|$SKIP_NODE|$SKIP_DOCKER|$SKIP_MINIO|$SKIP_MAILU|$SKIP_MINOR_ES2|$SKIP_MINOR|$SKIP_PRE|$SKIP_OS|$SKIP_PHP|$SKIP_WINDOWS|$SKIP_MISC"
+SKIPPED_TAGS="mariadb:(rc|beta|alpha|[^.]+\.[^.]+\.)"
 default_images="
 library/mariadb
 "
@@ -288,12 +288,40 @@ NODE_TOP="$(echo $(find_top_node))"
 MAILU_VERSiON=1.7
 
 BATCHED_IMAGES="\
-library/mariadb/latest\
- library/mariadb/10\
+library/mariadb/10\
+ library/mariadb/5\
+ library/mariadb/latest::30
+library/mariadb/10.0\
  library/mariadb/10.1\
  library/mariadb/10.2\
  library/mariadb/10.3\
- library/mariadb/10.4::7   
+ library/mariadb/10.4\
+ library/mariadb/10.5\
+ library/mariadb/10.6\
+ library/mariadb/10.7\
+ library/mariadb/5.5::30
+library/mariadb/10.3-focal\
+ library/mariadb/10.4-focal\
+ library/mariadb/10.5-focal\
+ library/mariadb/10.6-focal\
+ library/mariadb/10.7-focal\
+ library/mariadb/10-focal\
+ library/mariadb/focal::30
+library/mariadb/10.0-jessie\
+ library/mariadb/10.1-jessie\
+ library/mariadb/10.2-jessie\
+ library/mariadb/10.3-jessie\
+ library/mariadb/10-jessie\
+ library/mariadb/jessie::30
+library/mariadb/10.1-bionic\
+ library/mariadb/10.2-bionic\
+ library/mariadb/10.3-bionic\
+ library/mariadb/10.4-bionic\
+ library/mariadb/10.5-bionic\
+ library/mariadb/10-bionic\
+ library/mariadb/bionic::30
+library/mariadb/5.5-trusty\
+ library/mariadb/5-trusty::30
 "
 SKIP_REFRESH_ANCESTORS=${SKIP_REFRESH_ANCESTORS-}
 
