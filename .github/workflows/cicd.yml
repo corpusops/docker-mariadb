@@ -66,6 +66,7 @@ jobs:
       matrix:
         IMAGES:
         - "library/mariadb/10 library/mariadb/5 library/mariadb/latest"
+        - "library/mariadb/10.10-jammy"
         - "library/mariadb/10.0 library/mariadb/10.1 library/mariadb/10.2 library/mariadb/10.3 library/mariadb/10.4 library/mariadb/10.5 library/mariadb/10.6 library/mariadb/10.7 library/mariadb/5.5"
         - "library/mariadb/10.3-focal library/mariadb/10.4-focal library/mariadb/10.5-focal library/mariadb/10.6-focal library/mariadb/10.7-focal library/mariadb/10-focal library/mariadb/focal"
         - "library/mariadb/10.0-jessie library/mariadb/10.1-jessie library/mariadb/10.2-jessie library/mariadb/10.3-jessie library/mariadb/10-jessie library/mariadb/jessie"

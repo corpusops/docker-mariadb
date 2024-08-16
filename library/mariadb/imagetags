@@ -7,6 +7,7 @@
 10
 10-bionic
 10-focal
+10-jammy
 10-jessie
 10.0
 10.0-jessie
@@ -31,7 +32,15 @@
 10.6-focal
 10.7
 10.7-focal
+10.8
+10.8-focal
+10.8-jammy
+10.9
+10.9-jammy
+10.10
+10.10-jammy
 bionic
 focal
+jammy
 jessie
 latest
