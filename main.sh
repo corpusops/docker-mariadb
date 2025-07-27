@@ -262,7 +262,9 @@ IMAGES_SKIP_NS="((mailhog|postgis|pgrouting(-bare)?|^library|dejavu|(minio/(mini
 
 SKIPPED_TAGS="$SKIP_PRE|$SKIP_MINOR_OS|$SKIP_MINOR"
 
-SKIPPED_TAGS="mariadb:(rc|beta|alpha|[^.]+\.[^.]+\.)|-rc|trusty|10.1-bionic|jessie|:5|10.0|10.1|-ubi[012345789]?|(jammy|bionic|noble|focal)"
+MARIADB_SKIPPED_TAGS="mariadb:(rc|beta|alpha|[^.]+\.[^.]+\.|.*-rc|.*trusty|10.1-bionic|.*jessie|5|10.0|10.1|.*-ubi[012345789]?|(.*(jammy|bionic|noble|focal)))"
+SKIPPED_TAGS="$MARIADB_SKIPPED_TAGS"
+PROTECTED_VERSIONS=""
 default_images="
 library/mariadb
 "
